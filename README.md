@@ -29,6 +29,7 @@ This creates a repository with GitHub Actions, catalog UI on GitHub Pages, and r
 - **Advanced filtering** - Include/exclude by rank, API presence, staleness, or specific checks
 - **Service detail modals** - View check results, API specs, workflows, and contributors
 - **Badge generation** - Embed shields.io-compatible badges in your READMEs
+- **Optional PR-only remediation** - Deterministic corrections for eligible failed checks, disabled until explicit policy and security prerequisites are configured
 
 ![Teams Dashboard](documentation/images/catalog-teams.png)
 
@@ -85,11 +86,13 @@ Each check has a weight reflecting its importance. Higher-weighted checks (like 
 ## Documentation
 
 ### Setup Guides
+
 - **[Platform Installation](documentation/guides/platform-installation.md)** - Set up Scorecards for your organization
 - **[Service Installation](documentation/guides/service-installation.md)** - Add Scorecards to your service
 - **[Configuration Guide](documentation/guides/configuration.md)** - Customize your setup
 
 ### Reference
+
 - **[Action Reference](documentation/reference/action-reference.md)** - Action inputs, outputs, badges
 - **[Check Development Guide](documentation/guides/check-development-guide.md)** - Create custom checks
 - **[Comparison Guide](documentation/comparison.md)** - Scorecards vs. Backstage vs. Cortex
@@ -97,39 +100,15 @@ Each check has a weight reflecting its importance. Higher-weighted checks (like 
 
 ### For Service Teams
 
-Add this workflow to your service repository:
+Copy the maintained [scoring workflow template](documentation/examples/scorecard-workflow-template.yml) and follow the [Service Installation Guide](documentation/guides/service-installation.md). Separate service/platform checkouts preserve the source revisions needed by optional remediation.
 
-```yaml
-# .github/workflows/scorecards.yml
-name: Scorecards
-
-on:
-  schedule:
-    - cron: '0 0 * * *'  # Daily
-  workflow_dispatch:
-
-jobs:
-  scorecards:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run Scorecards
-        uses: feddericovonwernich-org/scorecards/action@main
-        with:
-          github-token: ${{ secrets.SCORECARDS_CATALOG_TOKEN }}
-          scorecards-repo: 'your-org/scorecards'
-```
+For remediation, see the [architecture, explorable diagrams and activation checklist](documentation/architecture/flows/remediation-flow.md). Installation does not enable it; corrections always require a PR and human review.
 
 ---
 
 ## Token Requirements
 
-| Token | Purpose | Required Scopes |
-|-------|---------|-----------------|
-| `SCORECARDS_CATALOG_TOKEN` | Write results to catalog | `repo` |
-| `SCORECARDS_WORKFLOW_TOKEN` | Create PRs with workflows (optional) | `repo`, `workflow` |
-
-See [Token Requirements Guide](documentation/guides/token-requirements.md) for setup instructions.
+See the [Token Requirements Guide](documentation/reference/token-requirements.md) for catalog publication, installation and remediation permissions, setup instructions and security prerequisites.
 
 ---
 
@@ -138,6 +117,7 @@ See [Token Requirements Guide](documentation/guides/token-requirements.md) for s
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 To add a new check:
+
 1. Create a script in `checks/your-check/check.sh`
 2. Add metadata in `checks/your-check/metadata.json`
 3. Add tests

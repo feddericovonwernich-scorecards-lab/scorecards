@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve remediation source contents, reuse mixed-case destination PRs, retain accepted requests and verified run links when discovery fails, and align installation template consumers.
+- Preserve case-sensitive remediation badge URLs and publish validated README bytes without Git encoding/filter conversions; document fresh scoring and separate service/platform checkouts.
+- Accept canonical GitHub repository casing in remediation links, retain the run-summary fallback for incomplete PR searches, and derive clone/push destinations only from the authorized repository.
+
 - Keep API Explorer's long source URLs, expanded schemas and responses reachable on narrow screens without horizontal page overflow.
 - Preserve the compiled API Explorer during publication; use Pages-compatible hash routes with legacy Services/Teams entry redirects.
 - Keep mobile service/team panels and adoption statistics visible, with scrolling confined to wide tables and code.
@@ -29,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional failed-check remediation through a central workflow, tokenless Docker recipe sandbox and human-reviewed PR only; ships disabled with explicit actor/target policy and runtime/protection activation prerequisites.
+- Conservative, idempotent Scorecards badge recipe for existing READMEs, evaluation provenance, correlated workflow links and maintained remediation architecture diagrams.
 - CHANGELOG.md to track project changes
 - Glossary of domain-specific terms
 

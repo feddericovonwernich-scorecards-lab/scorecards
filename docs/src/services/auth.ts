@@ -2,6 +2,7 @@
  * Authentication and Token Management
  * Handles GitHub Personal Access Token (PAT) storage and validation
  */
+import { useAppStore } from '../stores/appStore.js';
 
 // In-memory PAT storage (not persisted to localStorage for security)
 let githubPAT: string | null = null;
@@ -32,6 +33,9 @@ export function setToken(token: string | null): void {
  */
 export function clearToken(): void {
   githubPAT = null;
+  const store = useAppStore.getState();
+  store.setAuth(null, false);
+  store.setAuthUser(null);
 }
 
 /**

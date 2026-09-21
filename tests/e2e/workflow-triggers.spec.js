@@ -36,14 +36,19 @@ test.describe('Workflow Triggers - Single Service', () => {
     await expect(staleCard).toBeVisible();
 
     const triggerBtn = staleCard.locator('button[title*="Re-run"], button[title*="trigger"]');
-    if (await triggerBtn.count() > 0) {
+    if ((await triggerBtn.count()) > 0) {
       await expect(triggerBtn.first()).toBeVisible();
 
       // Test 2: Trigger workflow with PAT
       await setGitHubPAT(page, mockPAT);
       await mockWorkflowDispatch(page, { status: 204 });
 
-      if (await triggerBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (
+        await triggerBtn
+          .first()
+          .isVisible({ timeout: 2000 })
+          .catch(() => false)
+      ) {
         await triggerBtn.first().click();
         await expect(page.locator('.toast').first()).toBeVisible({ timeout: 5000 });
       }
@@ -72,7 +77,7 @@ test.describe('Workflow Triggers - Bulk Operations', () => {
     await expect(rerunInstalledButton).toBeVisible();
 
     // Handle dialogs
-    page.on('dialog', async dialog => {
+    page.on('dialog', async (dialog) => {
       await dialog.accept();
     });
 
@@ -85,12 +90,19 @@ test.describe('Workflow Triggers - Bulk Operations', () => {
     await expect(page.locator('.toast').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('should trigger bulk workflows with PAT and handle success', async ({ page }) => {
+  test('should trigger bulk workflows with a validated 200 receipt', async ({ page }) => {
     await setGitHubPAT(page, mockPAT);
-    await mockWorkflowDispatch(page, { status: 204 });
+    await mockWorkflowDispatch(page, {
+      status: 200,
+      body: {
+        workflow_run_id: 42,
+        run_url: 'https://api.github.com/repos/feddericovonwernich/scorecards/actions/runs/42',
+        html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+      },
+    });
 
     let dialogShown = false;
-    page.on('dialog', async dialog => {
+    page.on('dialog', async (dialog) => {
       dialogShown = true;
       await dialog.accept();
     });
@@ -116,7 +128,7 @@ test.describe('Workflow Triggers - Bulk Operations', () => {
   test('should handle bulk trigger errors (401, 403, 500)', async ({ page }) => {
     await setGitHubPAT(page, mockPAT);
 
-    page.on('dialog', async dialog => {
+    page.on('dialog', async (dialog) => {
       await dialog.accept();
     });
 
@@ -166,7 +178,7 @@ test.describe('Workflow Triggers - Settings Integration', () => {
 
     await mockWorkflowDispatch(page, { status: 204 });
 
-    page.on('dialog', async dialog => {
+    page.on('dialog', async (dialog) => {
       await dialog.accept();
     });
 
@@ -207,13 +219,17 @@ test.describe('Workflow Triggers - Service Modal', () => {
     // Test 1: Open modal and verify workflow tab
     await openServiceModal(page, 'test-repo-perfect');
 
-    const workflowTab = page.locator('#service-modal').getByRole('button', { name: 'Workflow Runs' });
+    const workflowTab = page
+      .locator('#service-modal')
+      .getByRole('button', { name: 'Workflow Runs' });
     await expect(workflowTab).toBeVisible();
 
     await workflowTab.click();
     await page.waitForTimeout(500);
 
-    const tabContent = page.locator('#service-modal .tab-content, #service-modal [class*="tab-content"]');
+    const tabContent = page.locator(
+      '#service-modal .tab-content, #service-modal [class*="tab-content"]'
+    );
     await expect(tabContent).toBeVisible();
 
     await closeServiceModal(page);
@@ -226,7 +242,10 @@ test.describe('Workflow Triggers - Service Modal', () => {
     await page.waitForTimeout(500);
 
     const modal = page.locator('#service-modal');
-    const hasContent = await modal.locator('.workflow-run, .workflow-runs, [class*="workflow"], p, .empty-state, .loading').first().isVisible();
+    const hasContent = await modal
+      .locator('.workflow-run, .workflow-runs, [class*="workflow"], p, .empty-state, .loading')
+      .first()
+      .isVisible();
     expect(hasContent).toBe(true);
 
     await closeServiceModal(page);

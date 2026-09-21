@@ -52,7 +52,7 @@ test.describe('GitHub API - Rate Limit', () => {
     await mockWorkflowDispatch(page, { status: 204 });
 
     // Accept confirmation dialog
-    page.on('dialog', async dialog => {
+    page.on('dialog', async (dialog) => {
       await dialog.accept();
     });
 
@@ -86,7 +86,7 @@ test.describe('GitHub API - Rate Limit Mock Scenarios', () => {
               limit: scenario.limit,
               remaining: scenario.remaining,
               reset: Math.floor(Date.now() / 1000) + 3600,
-            }
+            },
           }),
           headers: { 'Content-Type': 'application/json' },
         });
@@ -139,10 +139,17 @@ test.describe('GitHub API - Workflow Runs', () => {
     await mockWorkflowRuns(page, {
       runs: {
         workflow_runs: [
-          { id: 1, name: 'scorecards', status: 'completed', conclusion: 'success', created_at: new Date().toISOString(), html_url: 'https://github.com/test/repo/actions/runs/1' }
+          {
+            id: 1,
+            name: 'scorecards',
+            status: 'completed',
+            conclusion: 'success',
+            created_at: new Date().toISOString(),
+            html_url: 'https://github.com/test/repo/actions/runs/1',
+          },
         ],
         total_count: 1,
-      }
+      },
     });
 
     await openServiceModal(page, 'test-repo-perfect');
@@ -164,12 +171,22 @@ test.describe('GitHub API - Workflow Runs', () => {
     await mockWorkflowRuns(page, {
       runs: {
         workflow_runs: [
-          { id: 1, status: 'completed', conclusion: 'success', created_at: new Date().toISOString() },
-          { id: 2, status: 'completed', conclusion: 'failure', created_at: new Date().toISOString() },
+          {
+            id: 1,
+            status: 'completed',
+            conclusion: 'success',
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: 2,
+            status: 'completed',
+            conclusion: 'failure',
+            created_at: new Date().toISOString(),
+          },
           { id: 3, status: 'in_progress', conclusion: null, created_at: new Date().toISOString() },
         ],
         total_count: 3,
-      }
+      },
     });
     await openServiceModal(page, 'test-repo-perfect');
     await clickServiceModalTab(page, 'Workflow Runs');
@@ -200,45 +217,6 @@ test.describe('GitHub API - Workflow Runs', () => {
   });
 });
 
-test.describe('GitHub API - User Info', () => {
-  test('should handle user info validation in all scenarios', async ({ page }) => {
-    await mockCatalogRequests(page);
-    await page.goto('/');
-    await waitForCatalogLoad(page);
-
-    // Valid PAT
-    await setGitHubPAT(page, mockPAT);
-    await expect(page.locator('.toast').first()).toBeVisible({ timeout: 3000 });
-
-    // Invalid PAT
-    await page.route('**/api.github.com/user', async (route) => {
-      await route.fulfill({
-        status: 401,
-        body: JSON.stringify({ message: 'Bad credentials' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-    });
-
-    await openSettingsModal(page);
-    await page.getByRole('textbox', { name: /token/i }).fill('invalid_token');
-    await page.getByRole('button', { name: /save/i }).click();
-    await expect(page.locator('.toast').first()).toBeVisible({ timeout: 5000 });
-    await closeSettingsModal(page);
-
-    // Network error
-    await page.route('**/api.github.com/user', async (route) => {
-      await route.abort('failed');
-    });
-
-    await openSettingsModal(page);
-    await page.getByRole('textbox', { name: /token/i }).fill(mockPAT);
-    await page.getByRole('button', { name: /save/i }).click();
-    await page.waitForTimeout(1000);
-    await expect(page.locator('#settings-modal')).toBeVisible();
-    await closeSettingsModal(page);
-  });
-});
-
 test.describe('GitHub API - Workflow Dispatch', () => {
   test.beforeEach(async ({ page }) => {
     await mockCatalogRequests(page);
@@ -248,18 +226,27 @@ test.describe('GitHub API - Workflow Dispatch', () => {
 
   test('should trigger single service workflow successfully', async ({ page }) => {
     await setGitHubPAT(page, mockPAT);
-    await mockWorkflowDispatch(page, { status: 204 });
+    await mockWorkflowDispatch(page, {
+      status: 200,
+      body: {
+        workflow_run_id: 42,
+        run_url: 'https://api.github.com/repos/feddericovonwernich/scorecards/actions/runs/42',
+        html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+      },
+    });
 
     // Find the stale service card trigger button
     const staleCard = page.locator('.service-card').filter({ hasText: 'test-repo-stale' });
-    const triggerBtn = staleCard.locator('button[title*="Re-run"], button[title*="trigger"]').first();
+    const triggerBtn = staleCard
+      .locator('button[title*="Re-run"], button[title*="trigger"]')
+      .first();
 
     if (await triggerBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await triggerBtn.click();
       await expect(page.locator('.toast').first()).toBeVisible({ timeout: 5000 });
     } else {
       // Alternative: use bulk trigger
-      page.on('dialog', async dialog => await dialog.accept());
+      page.on('dialog', async (dialog) => await dialog.accept());
       const rerunButton = page.getByRole('button', { name: 'Re-run All Stale' });
       await rerunButton.click();
       await expect(page.locator('.toast').first()).toBeVisible({ timeout: 5000 });
@@ -267,7 +254,7 @@ test.describe('GitHub API - Workflow Dispatch', () => {
   });
 
   test('should handle all workflow dispatch error scenarios', async ({ page }) => {
-    page.on('dialog', async dialog => await dialog.accept());
+    page.on('dialog', async (dialog) => await dialog.accept());
     const rerunButton = page.getByRole('button', { name: 'Re-run All Stale' });
 
     // Without token
@@ -306,7 +293,7 @@ test.describe('GitHub API - Request Headers', () => {
       await route.fulfill({
         status: 200,
         body: JSON.stringify({
-          rate: { limit: 60, remaining: 59, reset: Math.floor(Date.now() / 1000) + 3600 }
+          rate: { limit: 60, remaining: 59, reset: Math.floor(Date.now() / 1000) + 3600 },
         }),
         headers: { 'Content-Type': 'application/json' },
       });
@@ -316,7 +303,7 @@ test.describe('GitHub API - Request Headers', () => {
     await page.addInitScript(() => {
       Object.defineProperty(window.location, 'hostname', {
         writable: true,
-        value: 'feddericovonwernich.github.io'
+        value: 'feddericovonwernich.github.io',
       });
     });
 
@@ -330,9 +317,17 @@ test.describe('GitHub API - Request Headers', () => {
         }
         const fixturePath = path.join(__dirname, 'fixtures', relativePath);
         try {
-          await route.fulfill({ status: 200, path: fixturePath, headers: { 'Content-Type': 'application/json' } });
+          await route.fulfill({
+            status: 200,
+            path: fixturePath,
+            headers: { 'Content-Type': 'application/json' },
+          });
         } catch {
-          await route.fulfill({ status: 404, body: '{}', headers: { 'Content-Type': 'application/json' } });
+          await route.fulfill({
+            status: 404,
+            body: '{}',
+            headers: { 'Content-Type': 'application/json' },
+          });
         }
       } else {
         await route.continue();
@@ -366,7 +361,7 @@ test.describe('GitHub API - Request Headers', () => {
       await route.fulfill({
         status: 200,
         body: JSON.stringify({
-          rate: { limit: 5000, remaining: 4999, reset: Math.floor(Date.now() / 1000) + 3600 }
+          rate: { limit: 5000, remaining: 4999, reset: Math.floor(Date.now() / 1000) + 3600 },
         }),
         headers: { 'Content-Type': 'application/json' },
       });

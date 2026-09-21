@@ -4,11 +4,22 @@ This document provides detailed documentation for all GitHub Actions workflows i
 
 ## Overview
 
-The Scorecards system uses 8 workflows across three categories:
+The Scorecards system groups workflows into four categories:
 
 - **Development & Quality** - Testing and maintenance of the scorecards system itself
 - **Service Onboarding** - Installing scorecards in service repositories
 - **Execution & Maintenance** - Running checks and maintaining the catalog
+- **Optional Remediation** - Disabled-by-default, PR-only correction proposals
+
+### Optional remediation
+
+**Path:** `.github/workflows/remediate-check.yml`
+
+**Trigger:** Central `workflow_dispatch` with `org`, `repo`, `check_id`, `service_sha`, `suite_sha` and `request_id`. Run title: `remediation:<request_id>`.
+
+**Jobs:** A read-only validator checks the trusted active revision and explicit actor/target policy before the writer credential is used. A per-repository/check concurrency group then invokes `action/remediate/` to prepare a tokenless sandbox correction and publish only a fresh branch and PR. Pending runs can replace older pending runs; this is not a durable FIFO queue.
+
+**Security and results:** Ships disabled, checks out `github.sha` without persisted credentials and pins third-party actions. `SCORECARDS_WORKFLOW_TOKEN` is host-only, with no catalog-token fallback. A generated outcome is retained as `remediation-result.json` and a run summary; cancellation may prevent output. Workflow success is not evidence of a PR or a passing score. See the authoritative [flow, diagrams and activation prerequisites](../architecture/flows/remediation-flow.md).
 
 ## Development & Quality Workflows
 
@@ -182,10 +193,9 @@ The Scorecards system uses 8 workflows across three categories:
 
 3. **run-scorecards** - Calculates scorecards
    - Runs always if not installed (PR created or not)
-   - Checks cache for today's results (daily cache key: `scorecards-results-{repo}-{date}`)
-   - Runs scorecards action if not cached
+   - Checks out the service and central platform separately
+   - Runs the local platform action against `service-workspace`, producing fresh results with service and suite Git provenance
    - Displays results in GitHub Step Summary
-   - Saves results to cache
    - Uploads results as artifact
    - Outputs: `score`, `rank`, `passed-checks`, `total-checks`, `results-file`
 
@@ -217,8 +227,8 @@ The Scorecards system uses 8 workflows across three categories:
 **Jobs:**
 
 1. **scorecard** - Runs scorecards action
-   - Checks out service repository
-   - Runs scorecards action (`feddericovonwernich-org/scorecards/action@main`)
+   - Checks out the service into `service` and the central platform's default branch into `.scorecards-platform`
+   - Runs `./.scorecards-platform/action` with `service-workspace` pointing to the service checkout
    - Displays results in GitHub Step Summary
    - Uploads results as artifact
 
@@ -227,6 +237,7 @@ The Scorecards system uses 8 workflows across three categories:
 - `github-token` - Token with repo and contents permissions
 - `scorecards-repo` - Central scorecards repository
 - `scorecards-branch` - Branch for results (default: 'catalog')
+- `service-workspace` - Absolute path to the separate service checkout
 
 **Action Outputs:**
 
@@ -359,23 +370,12 @@ jobs:
 
 - Full installation + scoring functionality
 - Automatic installation PR creation
-- Daily caching to avoid duplicate runs
+- Fresh scoring with service and suite Git provenance
 - Example: test-repo-perfect's ci.yml
 
 ### Template Pattern
 
-`scorecard-workflow-template.yml` provides a simpler template for direct action usage:
-
-```yaml
-jobs:
-  scorecard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: feddericovonwernich-org/scorecards/action@main
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-```
+Use the maintained [service workflow template](../examples/scorecard-workflow-template.yml), customized with your central repository. It checks out the service and platform separately, invokes the local platform action, and passes the service checkout through `service-workspace`. This preserves the Git revisions of both inputs for evaluation provenance.
 
 **Benefits:**
 
@@ -393,24 +393,13 @@ Multiple workflows write to catalog branch to prevent conflicts and loops:
 - **Dedicated tokens**: All catalog updates use SCORECARDS_CATALOG_TOKEN
 - **Bot commits**: All automated commits by github-actions[bot]
 
-### Caching Strategy
+### Fresh Scoring
 
-`install.yml` implements daily result caching:
-
-- **Cache key**: `scorecards-results-{repo}-{date}`
-- **Cache duration**: Resets daily at midnight UTC
-- **Benefits**: Reduces API usage, speeds up repeated runs on same day
-- **Use case**: Multiple pushes/PRs on same day reuse cached results
+`install.yml` evaluates the checked-out service with the checked-out platform on every scoring run. It neither restores nor saves daily result caches: results must describe the service and suite revisions actually evaluated, including repeated runs on the same day. Results remain available in the step summary and uploaded artifact.
 
 ### Token Requirements
 
-The system uses three types of tokens:
-
-1. **GITHUB_TOKEN** (automatic) - Basic operations in service repos
-2. **SCORECARDS_CATALOG_TOKEN** (required) - Writes results to catalog branch (`repo` scope)
-3. **SCORECARDS_WORKFLOW_TOKEN** (optional) - Creates PRs with workflow files (`repo`, `workflow` scopes)
-
-**See [Token Requirements Guide](token-requirements.md) for setup instructions and detailed explanations.**
+See the [Token Requirements Guide](token-requirements.md) for scoring, installation and remediation credentials, permissions and activation safeguards.
 
 ## Quick Reference
 
@@ -423,6 +412,7 @@ The system uses three types of tokens:
 | install.yml                  | Onboarding  | Workflow call       | Reusable install + score |
 | scorecards.yml               | Execution   | Daily/push/manual   | Run checks in service    |
 | trigger-service-workflow.yml | Execution   | Manual              | Remote workflow trigger  |
+| remediate-check.yml          | Remediation | Manual              | Validate and propose PR  |
 | consolidate-registry.yml     | Maintenance | Registry updates    | Consolidate registry     |
 
 ## Related Documentation

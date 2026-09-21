@@ -13,11 +13,20 @@ import { ContributorsTab } from './tabs/ContributorsTab.js';
 import { WorkflowsTab } from './tabs/WorkflowsTab.js';
 import { BadgesTab } from './tabs/BadgesTab.js';
 import type {
-  ServiceData,
   CheckResult,
   Contributor,
+  DispatchReceipt,
+  EvaluationSource,
+  RemediationRequest,
+  ServiceData,
   WorkflowRun,
 } from '../../../types/index.js';
+import {
+  findRemediationPullRequest,
+  triggerCheckRemediation,
+  triggerScorecardWorkflow,
+} from '../../../api/github.js';
+import { fetchWithHybridAuth } from '../../../api/registry.js';
 import { useAppStore } from '../../../stores/appStore.js';
 
 // Types for service results data
@@ -30,6 +39,7 @@ interface ServiceResults {
   service: ServiceData & { openapi?: OpenAPIConfig };
   checks: CheckResult[];
   contributors?: Contributor[];
+  evaluation?: EvaluationSource;
 }
 
 interface OpenAPISummary {
@@ -64,7 +74,9 @@ function capitalize(str: string): string {
  * Parse OpenAPI summary from check stdout
  */
 function parseOpenAPISummary(stdout: string): OpenAPISummary | null {
-  if (!stdout) {return null;}
+  if (!stdout) {
+    return null;
+  }
 
   const titleMatch = stdout.match(/Title: (.+)/);
   const versionMatch = stdout.match(/OpenAPI version: ([\d.]+)/);
@@ -88,9 +100,7 @@ function parseOpenAPISummary(stdout: string): OpenAPISummary | null {
 function getOpenAPIInfo(data: ServiceResults): OpenAPIInfo {
   const openApiCheck = data.checks?.find((c) => c.check_id === '06-openapi-spec');
   const summary =
-    openApiCheck?.status === 'pass'
-      ? parseOpenAPISummary(openApiCheck.stdout || '')
-      : null;
+    openApiCheck?.status === 'pass' ? parseOpenAPISummary(openApiCheck.stdout || '') : null;
 
   if (data.service.openapi) {
     return {
@@ -124,19 +134,26 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
   const [error, setError] = useState<string | null>(null);
   const [workflowFeedback, setWorkflowFeedback] = useState<{
     message: string;
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'warning';
+    links?: Array<{ href: string; label: string }>;
   } | null>(null);
   const [serviceData, setServiceData] = useState<ServiceResults | null>(null);
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [isStale, setIsStale] = useState(false);
   const workflowLifetimeRef = useRef(0);
+  const remediationAbortRef = useRef(new Set<AbortController>());
+
   const headingRef = useRef<HTMLHeadingElement>(null);
   const service = serviceData?.service;
 
   useLayoutEffect(() => {
+    const lifetime = workflowLifetimeRef.current;
+    const controllers = remediationAbortRef.current;
     setWorkflowFeedback(null);
     return () => {
-      ++workflowLifetimeRef.current;
+      workflowLifetimeRef.current = lifetime + 1;
+      controllers.forEach((controller) => controller.abort());
+      controllers.clear();
     };
   }, [isOpen, org, repo]);
 
@@ -145,18 +162,14 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
     if (!isOpen || !org || !repo) {
       return;
     }
+    const lifetime = workflowLifetimeRef.current;
 
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-
       try {
-        // Use fetchWithHybridAuth like the vanilla JS modal
-        const { fetchWithHybridAuth } = await import('../../../api/registry.js');
-
         const resultsPath = `results/${org}/${repo}/results.json`;
         const registryPath = `registry/${org}/${repo}.json`;
-
         const [resultsData, registryData] = await Promise.all([
           fetchWithHybridAuth(resultsPath),
           fetchWithHybridAuth(registryPath),
@@ -197,19 +210,26 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
           },
           checks: data.checks || [],
           contributors: data.recent_contributors || [],
+          evaluation: data.evaluation,
         };
 
+        if (workflowLifetimeRef.current !== lifetime) {
+          return;
+        }
         setServiceData(results);
 
         // Check staleness using Zustand store
         const checksHash = useAppStore.getState().ui.checksHash;
-        const isServiceStale =
-          checksHash !== null && data.checks_hash !== checksHash;
+        const isServiceStale = checksHash !== null && data.checks_hash !== checksHash;
         setIsStale(isServiceStale);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load service');
+        if (workflowLifetimeRef.current === lifetime) {
+          setError(err instanceof Error ? err.message : 'Failed to load service');
+        }
       } finally {
-        setLoading(false);
+        if (workflowLifetimeRef.current === lifetime) {
+          setLoading(false);
+        }
       }
     };
 
@@ -218,13 +238,14 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
 
   // Handle triggering workflow
   const handleTriggerWorkflow = useCallback(async () => {
-    if (!org || !repo) {return;}
+    if (!org || !repo) {
+      return;
+    }
 
     const lifetime = workflowLifetimeRef.current;
     setWorkflowFeedback(null);
     try {
-      const { triggerScorecardWorkflow } = await import('../../../api/github.js');
-      if (!await triggerScorecardWorkflow(org, repo)) {
+      if (!(await triggerScorecardWorkflow(org, repo))) {
         throw new Error('Failed to trigger workflow');
       }
       if (workflowLifetimeRef.current === lifetime) {
@@ -240,16 +261,100 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
     }
   }, [org, repo]);
 
+  const handleRemediation = useCallback(
+    async (check: CheckResult): Promise<DispatchReceipt> => {
+      const evaluation = serviceData?.evaluation;
+      if (!org || !repo || !evaluation) {
+        return { accepted: false, reason: 'This result has no remediation provenance' };
+      }
+      const lifetime = workflowLifetimeRef.current;
+      const controller = new AbortController();
+      remediationAbortRef.current.add(controller);
+
+      const request: RemediationRequest = {
+        org,
+        repo,
+        check_id: check.check_id,
+        service_sha: evaluation.service_sha,
+        suite_sha: evaluation.suite_sha,
+        request_id: crypto.randomUUID(),
+      };
+      try {
+        const receipt = await triggerCheckRemediation(request, {
+          signal: controller.signal,
+          onProgress: (message) => {
+            if (workflowLifetimeRef.current === lifetime) {
+              setWorkflowFeedback({ message, type: 'success' });
+            }
+          },
+        });
+        if (workflowLifetimeRef.current === lifetime) {
+          if (!receipt.accepted) {
+            setWorkflowFeedback({ message: receipt.reason, type: 'error' });
+          } else {
+            const links = receipt.runUrl
+              ? [{ href: receipt.runUrl, label: 'View remediation run' }]
+              : [];
+            if (receipt.runId) {
+              const pullRequest = await findRemediationPullRequest(
+                request,
+                receipt.runId,
+                controller.signal
+              ).catch(() => null);
+              if (pullRequest) {
+                links.push({
+                  href: pullRequest.url,
+                  label: `View pull request #${pullRequest.number}`,
+                });
+              }
+            }
+            if (workflowLifetimeRef.current === lifetime) {
+              setWorkflowFeedback({
+                message:
+                  receipt.reason ||
+                  `Remediation request accepted. The check result remains failed until reevaluation.${receipt.runUrl && links.length === 1 ? ' See the remediation run summary for the pull request or outcome.' : ''}`,
+                type: 'success',
+                links,
+              });
+            }
+          }
+        }
+        return receipt;
+      } catch (err) {
+        const receipt: DispatchReceipt = {
+          accepted: false,
+          reason: err instanceof Error ? err.message : 'Failed to request remediation',
+        };
+        if (workflowLifetimeRef.current === lifetime) {
+          setWorkflowFeedback({ message: receipt.reason, type: 'error' });
+        }
+        return receipt;
+      } finally {
+        remediationAbortRef.current.delete(controller);
+      }
+    },
+    [org, repo, serviceData?.evaluation]
+  );
+
+  const handleRemediationSettings = useCallback(() => {
+    setWorkflowFeedback({
+      message: 'Configure a GitHub PAT in Settings to request remediation.',
+      type: 'warning',
+    });
+    window.openSettings?.();
+  }, []);
+
   // Handle refresh
   const handleRefresh = useCallback(async () => {
-    if (!org || !repo) {return;}
+    if (!org || !repo) {
+      return;
+    }
+    const lifetime = workflowLifetimeRef.current;
 
     headingRef.current?.focus({ preventScroll: true });
     setError(null);
     setLoading(true);
     try {
-      const { fetchWithHybridAuth } = await import('../../../api/registry.js');
-
       const resultsPath = `results/${org}/${repo}/results.json`;
       const registryPath = `registry/${org}/${repo}.json`;
 
@@ -289,19 +394,31 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
         },
         checks: data.checks || [],
         contributors: data.recent_contributors || [],
+        evaluation: data.evaluation,
       };
 
+      if (workflowLifetimeRef.current !== lifetime) {
+        return;
+      }
       setServiceData(results);
+      const checksHash = useAppStore.getState().ui.checksHash;
+      setIsStale(checksHash !== null && data.checks_hash !== checksHash);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh');
+      if (workflowLifetimeRef.current === lifetime) {
+        setError(err instanceof Error ? err.message : 'Failed to refresh');
+      }
     } finally {
-      setLoading(false);
+      if (workflowLifetimeRef.current === lifetime) {
+        setLoading(false);
+      }
     }
   }, [org, repo]);
 
   // Build tabs based on available data
   const tabs = useMemo((): Tab[] => {
-    if (!serviceData) {return [];}
+    if (!serviceData) {
+      return [];
+    }
 
     const service = serviceData.service;
     const checks = serviceData.checks || [];
@@ -313,7 +430,16 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
       {
         id: 'checks',
         label: 'Check Results',
-        content: <ChecksTab checks={checks} />,
+        content: (
+          <ChecksTab
+            checks={checks}
+            org={org || ''}
+            repo={repo || ''}
+            evaluation={serviceData.evaluation}
+            onRemediate={handleRemediation}
+            onSettingsRequired={handleRemediationSettings}
+          />
+        ),
       },
     ];
 
@@ -373,7 +499,7 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
     });
 
     return tabList;
-  }, [serviceData, org, repo, workflowRuns]);
+  }, [serviceData, org, repo, workflowRuns, handleRemediation, handleRemediationSettings]);
 
   // Render modal content
   const renderContent = () => {
@@ -421,11 +547,7 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
               </svg>
               View on GitHub
             </a>
-            <button
-              onClick={handleRefresh}
-              className="github-button"
-              title="Refresh data"
-            >
+            <button onClick={handleRefresh} className="github-button" title="Refresh data">
               <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z" />
               </svg>
@@ -444,10 +566,16 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
 
           {workflowFeedback && (
             <p
-              role={workflowFeedback.type === 'error' ? 'alert' : 'status'}
-              className={workflowFeedback.type === 'error' ? 'text-error' : 'text-success'}
+              role={workflowFeedback.type === 'success' ? 'status' : 'alert'}
+              className={workflowFeedback.type === 'success' ? 'text-success' : 'text-error'}
             >
               {workflowFeedback.message}
+              {workflowFeedback.links?.map((link) => (
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer">
+                  {' '}
+                  {link.label}
+                </a>
+              ))}
             </p>
           )}
 
@@ -458,8 +586,8 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
                 <path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575L6.457 1.047ZM8 5a.75.75 0 0 0-.75.75v2.5a.75.75 0 0 0 1.5 0v-2.5a.75.75 0 0 0-.75-.75Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />
               </svg>
               <span>
-                This service was scored with an older version of checks. Re-run the
-                scorecard to get updated results.
+                This service was scored with an older version of checks. Re-run the scorecard to get
+                updated results.
               </span>
             </div>
           )}
@@ -478,9 +606,7 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
             </div>
             {excludedCount > 0 && (
               <div className="modal-stat-item">
-                <div className="modal-stat-value modal-stat-excluded">
-                  {excludedCount}
-                </div>
+                <div className="modal-stat-value modal-stat-excluded">{excludedCount}</div>
                 <div className="modal-stat-label">Excluded</div>
               </div>
             )}
@@ -495,7 +621,9 @@ export function ServiceModal({ isOpen, onClose, org, repo }: ServiceModalProps) 
     return (
       <div id="service-detail">
         <div className="service-modal-title-row">
-          <h2 ref={headingRef} tabIndex={-1}>{service?.name || repo || 'Service details'}</h2>
+          <h2 ref={headingRef} tabIndex={-1}>
+            {service?.name || repo || 'Service details'}
+          </h2>
           {service && (
             <div className={`rank-badge modal-header-badge ${service.rank}`}>
               {capitalize(service.rank)}

@@ -10,6 +10,7 @@ export const WORKFLOWS: WorkflowConfig = {
     triggerService: 'trigger-service-workflow.yml',
     createInstallPR: 'create-installation-pr.yml',
     scorecard: 'scorecard.yml',
+    remediateCheck: 'remediate-check.yml',
   },
   polling: {
     default: 30000,
@@ -21,10 +22,6 @@ export const WORKFLOWS: WorkflowConfig = {
 /**
  * Build workflow dispatch URL
  */
-export function getWorkflowDispatchUrl(
-  owner: string,
-  repo: string,
-  workflowFile: string
-): string {
+export function getWorkflowDispatchUrl(owner: string, repo: string, workflowFile: string): string {
   return `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`;
 }

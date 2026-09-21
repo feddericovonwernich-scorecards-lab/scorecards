@@ -17,63 +17,24 @@ Before you begin, ensure:
 
 ### Step 1: Add Scorecard Action to CI
 
-Create `.github/workflows/scorecards.yml` in your repository:
+Copy the maintained [scorecard workflow template](../examples/scorecard-workflow-template.yml) to `.github/workflows/scorecards.yml`, replacing its central repository and default-branch placeholders for your organization.
 
-> **Important:** Replace `your-org/scorecards` with your organization's central scorecards repository (set up by your platform team), not the template repository.
+The template checks out the service and Scorecards separately and passes `service-workspace` to the local Action. This records the actual revisions without adding platform files to the service being evaluated. Older workflows continue to score but may not supply the provenance required to offer remediation.
 
-```yaml
-name: Scorecards
+### Step 2: Add SCORECARDS_CATALOG_TOKEN Secret
 
-on:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight UTC
-  push:
-    branches:
-      - main  # or your default branch
-  workflow_dispatch:
+Provide `SCORECARDS_CATALOG_TOKEN` to the scoring workflow, preferably through an organization secret limited to the intended repositories. It needs write access to the central catalog; the service's default `GITHUB_TOKEN` does not automatically have cross-repository permission. See the [token requirements](../reference/token-requirements.md) rather than creating a second token configuration here.
 
-jobs:
-  scorecards:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+Remediation is a separate central workflow and is **not** enabled by installing scoring. A platform operator must explicitly allowlist your service/check/actors and verify its activation prerequisites. Any correction arrives as a PR for human review, never as a direct commit to your default branch. See the [remediation flow](../architecture/flows/remediation-flow.md).
 
-      - name: Run Scorecards
-        uses: feddericovonwernich-org/scorecards/action@main
-        with:
-          github-token: ${{ secrets.SCORECARDS_PAT }}
-          scorecards-repo: 'your-org/scorecards'  # Replace with YOUR organization's scorecards repo
-```
+### Step 3: Push to the Configured Branch
 
-**What to customize:**
-- `scorecards-repo`: Your organization's central scorecards repository (e.g., `acme-corp/scorecards`)
-
-### Step 2: Add SCORECARDS_PAT Secret
-
-> **Note:** Your platform team may have already configured `SCORECARDS_PAT` as an organizational secret. If so, you can skip this step. Check with your platform team or try running the workflow - it will only fail if the secret is missing.
-
-1. Create a Personal Access Token (PAT) with `repo` scope:
-   - Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Click "Generate new token (classic)"
-   - Select `repo` scope
-   - Generate and copy the token
-
-2. Add it to your repository secrets:
-   - Go to repository Settings → Secrets and variables → Actions
-   - Click "New repository secret"
-   - Name: `SCORECARDS_PAT`
-   - Value: Paste your PAT
-   - Click "Add secret"
-
-3. This allows pushing results to the central catalog
-
-### Step 3: Push to Default Branch
-
-Once you've added the workflow and secret, push to your default branch. The scorecard will run automatically!
+Push to a branch configured in the copied workflow. The maintained template runs on `main` and `master`; update those triggers if your default branch differs.
 
 ### Step 4: View Your Results
 
 After the first run:
+
 1. Visit the [Scorecards Catalog](https://feddericovonwernich-org.github.io/scorecards/)
 2. Find your service in the list
 3. See your score, rank, and detailed check results
@@ -92,6 +53,7 @@ Show your quality score directly in your README:
 ```
 
 **Replace the following:**
+
 - `YOUR-ORG/scorecards` - Your organization's central scorecards repository (e.g., `acme-corp/scorecards`)
 - `your-org/your-repo` - Your service's organization and repository name (e.g., `acme-corp/payment-service`)
 
@@ -105,21 +67,22 @@ Create `.scorecard/config.yml`:
 
 ```yaml
 service:
-  name: "My Awesome Service"
-  team: "Platform Team"
-  description: "Handles user authentication and authorization"
+  name: 'My Awesome Service'
+  team: 'Platform Team'
+  description: 'Handles user authentication and authorization'
   links:
-    - name: "Documentation"
-      url: "https://docs.example.com/my-service"
-    - name: "Runbook"
-      url: "https://wiki.example.com/runbooks/my-service"
+    - name: 'Documentation'
+      url: 'https://docs.example.com/my-service'
+    - name: 'Runbook'
+      url: 'https://wiki.example.com/runbooks/my-service'
 
 custom:
-  criticality: "high"
-  environment: "production"
+  criticality: 'high'
+  environment: 'production'
 ```
 
 **Benefits of adding metadata:**
+
 - Custom service names in the catalog (instead of repo names)
 - Team ownership visibility
 - Useful links directly in the catalog
@@ -137,12 +100,7 @@ Check that the file is in `.github/workflows/` and GitHub Actions is enabled for
 
 Ensure your token has write access to the central scorecards repository:
 
-1. Create a PAT with `repo` scope (GitHub Settings → Developer settings → Personal access tokens)
-2. Add it as a repository secret named `SCORECARDS_PAT`
-3. Use it in your workflow:
-   ```yaml
-   github-token: ${{ secrets.SCORECARDS_PAT }}
-   ```
+Check the `SCORECARDS_CATALOG_TOKEN` secret, its selected repositories/permissions and organization approval using the [token requirements](../reference/token-requirements.md). The maintained workflow uses it both for central checkout and catalog publication; do not substitute a service-scoped `GITHUB_TOKEN` for cross-repository access.
 
 ### Service doesn't appear in catalog
 
@@ -154,6 +112,7 @@ Ensure your token has write access to the central scorecards repository:
 ### Checks failing unexpectedly
 
 View detailed check results in the catalog:
+
 1. Visit the catalog page
 2. Click on your service card
 3. Review each check's output and error messages
