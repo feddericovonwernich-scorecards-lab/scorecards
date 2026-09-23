@@ -11,7 +11,7 @@ Scorecards uses two GitHub Personal Access Tokens (PATs) for different purposes:
 | `SCORECARDS_CATALOG_TOKEN`  | Write results to catalog branch                     | `repo`                                                          | **Yes**    |
 | `SCORECARDS_WORKFLOW_TOKEN` | Installation PRs and explicitly enabled remediation | Classic: `repo`; `workflow` additionally for installation files | Optional\* |
 
-\*Required for automated installation or enabled remediation; remediation is disabled by default.
+\*Required for automated installation or enabled remediation; see [Remediation Authorization](#remediation-authorization).
 
 Central `sync-docs.yml` and `update-checks-hash.yml` use the repository's
 ephemeral `GITHUB_TOKEN` with job-scoped `contents: write` for same-repository
@@ -105,7 +105,9 @@ The central executor's `SCORECARDS_WORKFLOW_TOKEN` must read the trusted central
 
 **Contents write is not PR-only or branch-scoped.** Before activation, verify effective default-branch restrictions requiring human review and excluding the publisher from bypass/direct writes and auto-merge. Protect the central policy/workflow and secret access as well. Record evidence in the target's `protection_evidence`; a nonempty string is not proof that controls are effective. If the holder or rules cannot be verified, keep remediation disabled.
 
-See [activation, threat boundaries and rollback](../architecture/flows/remediation-flow.md). This implementation does not create/rotate secrets, broaden permissions or activate targets.
+See the [bounded pilot exception, credential evidence and integration hold](../architecture/flows/remediation-flow.md#piloto-acotado-test-repo-minimal) for the authorized pilot's review requirements.
+
+See [activation, threat boundaries and rollback](../architecture/flows/remediation-flow.md). The executor does not create/rotate secrets or broaden permissions; target activation is controlled separately by the reviewed central policy.
 
 ## Token Security Best Practices
 

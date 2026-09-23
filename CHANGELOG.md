@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Prepare the single-repository badge pilot policy with the published runtime digest and verified publisher identity; document zero-independent-approval protection, integration prerequisites and still-unexercised consumer writes.
 - Pin runtime base/Node digests, signed Ubuntu snapshot and npm lockfile; retain scoring/sandbox compatibility without claiming bit-for-bit rebuilds.
 - **BREAKING**: Migrated catalog UI from vanilla JavaScript to React 19 + TypeScript
   - Replaced ES6 modules with React functional components
@@ -36,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Manual main-only GHCR runtime publication using ephemeral package credentials, real Docker smoke checks and registry digest receipts; publication and activation still require reviewed integration.
-- Optional failed-check remediation through a central workflow, tokenless Docker recipe sandbox and human-reviewed PR only; ships disabled with explicit actor/target policy and runtime/protection activation prerequisites.
+- Optional failed-check remediation through a central workflow, tokenless Docker recipe sandbox and human-reviewed PR only; see the [activation prerequisites](documentation/architecture/flows/remediation-flow.md#activación-prerrequisitos-externos-obligatorios).
 - Conservative, idempotent Scorecards badge recipe for existing READMEs, evaluation provenance, correlated workflow links and maintained remediation architecture diagrams.
 - CHANGELOG.md to track project changes
 - Glossary of domain-specific terms
