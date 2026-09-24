@@ -2,29 +2,41 @@
 
 This guide explains the GitHub tokens required for Scorecards and how to create them.
 
-## Token Overview
+## Token overview
 
-Scorecards uses two GitHub Personal Access Tokens (PATs) for different purposes:
+Scorecards has three user-managed credential roles and one repository-scoped ephemeral role:
 
-| Token                       | Purpose                                             | Scopes                                                          | Required?  |
-| --------------------------- | --------------------------------------------------- | --------------------------------------------------------------- | ---------- |
-| `SCORECARDS_CATALOG_TOKEN`  | Write results to catalog branch                     | `repo`                                                          | **Yes**    |
-| `SCORECARDS_WORKFLOW_TOKEN` | Installation PRs and explicitly enabled remediation | Classic: `repo`; `workflow` additionally for installation files | Optional\* |
+| Credential                  | Purpose                                                                                                                                                                                                 | Required where                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Installer `GITHUB_TOKEN`    | Create `owner/scorecards`, publish workflows, configure Pages and dispatch/read Actions                                                                                                                 | Operator environment only                               |
+| `SCORECARDS_CATALOG_TOKEN`  | Service-to-central checkout and normal result writes to `catalog`                                                                                                                                       | Each participating service workflow                     |
+| `SCORECARDS_WORKFLOW_TOKEN` | Dispatch/read central onboarding runs; read/write the central catalog registry and create installation branches and PRs containing workflow files in target services; separately authorized remediation | Central onboarding host and reusable onboarding callers |
+| Job `github.token`          | Same-repository consolidation, docs sync and checks-hash writes                                                                                                                                         | Issued per central workflow run                         |
 
-\*Required for automated installation or enabled remediation; see [Remediation Authorization](#remediation-authorization).
+The central repository does not receive `SCORECARDS_CATALOG_TOKEN` merely to consolidate its own registry. `.github/workflows/consolidate-registry.yml` requests `contents: write` and uses the job-scoped token. If a `catalog` ruleset blocks that bot, the run fails; resolve the minimum rule explicitly instead of falling back to a broader PAT.
 
-Central `sync-docs.yml` and `update-checks-hash.yml` use the repository's
-ephemeral `GITHUB_TOKEN` with job-scoped `contents: write` for same-repository
-catalog writes, not either PAT.
-The separate Pages deployment job uses only `contents: read`, `pages: write`
-and `id-token: write`. See the [deployment transition procedure](../../docs/README.md#deployment).
-This does not repair or expand cross-repository result/remediation credentials.
+Restricted Enterprise Pages delivery uses the operator's authenticated **Pages browser session**, not any repository PAT or job token. Keep that site-specific session separate from Git/API credentials and follow [restricted Pages verification](../guides/platform-installation.md#restricted-pages-verification) for hidden interactive input or a private cookie export. Never copy GitHub login cookies to Pages, expose session values in shell arguments/logs, or change visibility as an authentication workaround.
 
-## Why Two Tokens?
+## Operation matrix
 
-**SCORECARDS_CATALOG_TOKEN** - Every scorecard execution writes results to the catalog branch. This token needs `repo` scope to write to the catalog.
+| Credential                                  | Operation                                         | Fine-grained permission                                                                                | Classic scope                         | Observable preflight                                               |
+| ------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- | ------------------------------------------------------------------ |
+| Installer `GITHUB_TOKEN`                    | Identity and metadata                             | Metadata read                                                                                          | identity implied                      | `GET /user`                                                        |
+| Same                                        | Create `{owner}/scorecards`                       | Owner/org repository creation policy                                                                   | `public_repo` or `repo` by visibility | membership/policy only; creation is the capability test            |
+| Same                                        | Atomic code and workflow publication              | Contents read/write and Workflows read/write                                                           | `repo` + `workflow`                   | visible repository permissions; atomic push is the capability test |
+| Same                                        | Configure workflow Pages                          | Pages administration/manage                                                                            | repository admin/maintain             | visible role; Pages API is the capability test                     |
+| Same                                        | Dispatch and inspect Actions                      | Actions read/write                                                                                     | repository/workflow access            | CLI/endpoints, then the fresh dispatch                             |
+| `SCORECARDS_CATALOG_TOKEN`                  | Service writes to central `catalog`               | Contents read/write on central only                                                                    | `repo`                                | service checkout and first publication                             |
+| `SCORECARDS_WORKFLOW_TOKEN`                 | Central onboarding registry update                | Contents read/write on central Scorecards `catalog`                                                    | `repo`                                | catalog checkout and normal registry push                          |
+| Same                                        | Installation workflow and PR                      | Target-service Contents and Pull requests read/write; Workflows read/write when the PR adds a workflow | `repo` + `workflow`                   | target checkout, branch push and PR creation                       |
+| Same, passed as `scorecards-workflow-token` | Reusable onboarding dispatch and result retrieval | Actions read/write on central Scorecards; target Pull requests read/write for score updates            | `repo` + `workflow`                   | central dispatch, correlated run completion and result download    |
+| Central `github.token`                      | Consolidate same-repository registry              | Job `contents: write`                                                                                  | not applicable                        | normal bot push                                                    |
 
-**SCORECARDS_WORKFLOW_TOKEN** - Installation writes `.github/workflows/` and therefore requires the classic `workflow` scope in addition to repository access. The optional remediation executor reuses this configured secret without enlarging its scope or falling back to the catalog token. The badge recipe cannot modify workflows.
+GitHub exposes no read-only endpoint that proves every organization creation policy, fine-grained workflow write or Pages mutation in advance. A preflight result must not be described as proof of those later operations.
+
+## Why two persistent tokens?
+
+`SCORECARDS_CATALOG_TOKEN` crosses from a service into the central repository only to publish results. `SCORECARDS_WORKFLOW_TOKEN` authorizes the central owner to write its catalog registry and target-service Contents/Pull requests plus Workflows when installing `.github/workflows/scorecards.yml`. The reusable caller also needs central Actions read/write to dispatch that owner and read its completed result; its repository-scoped `GITHUB_TOKEN` cannot replace this cross-repository credential. Restrict repository selection and secret distribution to the participating repositories. Same-repository consolidation uses the ephemeral job token, not either PAT.
 
 ## Creating SCORECARDS_CATALOG_TOKEN
 
@@ -56,9 +68,9 @@ This token allows Scorecards to write results to the catalog branch.
 
 ## Creating SCORECARDS_WORKFLOW_TOKEN
 
-This token allows installation PRs and, only after explicit activation, remediation branches and PRs.
+This token allows installation PRs, central onboarding dispatch/result retrieval and, only after explicit activation, remediation branches and PRs.
 
-Classic scopes and fine-grained repository permissions are different models. A fine-grained token should select only the required repositories and grant Contents/Pull requests write, plus Workflows write when installing workflow files. Verify organization approval and current endpoint support; do not grant Workflows write solely for the badge pilot. The existing classic-token setup is shown below.
+Classic scopes and fine-grained repository permissions are different models. A fine-grained token must select the central Scorecards repository with Contents read/write for onboarding registry updates and Actions read/write for reusable onboarding dispatch and results, plus each target service with Contents/Pull requests read/write and Workflows read/write when installing workflow files. Verify organization approval and current endpoint support; do not grant Workflows write solely for the badge pilot. The existing classic-token setup is shown below.
 
 ### Step 1: Generate Classic Token
 
@@ -80,22 +92,22 @@ Classic scopes and fine-grained repository permissions are different models. A f
 3. Configure:
    - **Name:** `SCORECARDS_WORKFLOW_TOKEN`
    - **Value:** [paste token]
-   - **Repository access:** All repositories
+   - **Repository access:** Only the central onboarding host and service repositories that intentionally invoke the reusable workflow
 4. Click **Add secret**
 
 ## Service Repository Setup
 
-Each service repository needs access to `SCORECARDS_CATALOG_TOKEN` to write results.
+Each service repository's workflow must receive `SCORECARDS_CATALOG_TOKEN` without printing it. The PAT itself selects the central `{org}/scorecards` repository; organization-secret visibility separately selects which service repositories may consume it.
 
 **Using organization secrets** (recommended):
 
-- If the token is an organization secret with "All repositories" access, services automatically have access
-- No per-service configuration needed
+- Select only participating service repositories, or all repositories when that broader distribution is intentional.
+- The central repository does not need this secret for registry consolidation.
 
 **Using repository secrets** (alternative):
 
-- Add `SCORECARDS_CATALOG_TOKEN` to each service's Settings → Secrets and variables → Actions
-- Required if not using organization-wide secrets
+- Add `SCORECARDS_CATALOG_TOKEN` to each participating service's Settings → Secrets and variables → Actions.
+- Keep the token's repository access limited to the central Scorecards repository.
 
 ## Remediation Authorization
 

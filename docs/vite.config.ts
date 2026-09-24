@@ -3,12 +3,16 @@ import { resolve } from 'path';
 import react from '@vitejs/plugin-react';
 import istanbul from 'vite-plugin-istanbul';
 
+const repoOwner = JSON.stringify(process.env.SCORECARD_REPO_OWNER ?? '');
 export default defineConfig({
   // Root is the docs directory
   root: '.',
 
-  // Base path for GitHub Pages (repo is served at /scorecards/)
-  base: '/scorecards/',
+  base: './',
+
+  define: {
+    __SCORECARD_REPO_OWNER__: repoOwner,
+  },
 
   // Build output goes to dist/
   build: {
@@ -51,15 +55,15 @@ export default defineConfig({
     // Only instrument when COVERAGE env var is set (to avoid overhead in normal builds)
     ...(process.env.COVERAGE === 'true'
       ? [
-        istanbul({
-          include: ['src/**/*.ts', 'src/**/*.tsx'],
-          exclude: ['node_modules/**', 'dist/**', 'tests/**', '**/*.d.ts'],
-          extension: ['.ts', '.tsx'],
-          requireEnv: false,
-          forceBuildInstrument: true,
-          cwd: __dirname, // Ensure paths are relative to docs directory
-        }),
-      ]
+          istanbul({
+            include: ['src/**/*.ts', 'src/**/*.tsx'],
+            exclude: ['node_modules/**', 'dist/**', 'tests/**', '**/*.d.ts'],
+            extension: ['.ts', '.tsx'],
+            requireEnv: false,
+            forceBuildInstrument: true,
+            cwd: __dirname, // Ensure paths are relative to docs directory
+          }),
+        ]
       : []),
     // Plugin to rewrite .js imports to .ts/.tsx during development
     {

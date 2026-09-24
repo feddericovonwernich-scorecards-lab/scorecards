@@ -162,13 +162,15 @@ export async function loadServices(): Promise<LoadServicesResult> {
     const { response, usedAPI: fetchUsedAPI } = await fetchWithHybridAuth(
       'registry/all-services.json'
     );
-    usedAPI = fetchUsedAPI;
 
     if (response.ok) {
       const registryData: RegistryResponse = await response.json();
       if (registryData.services && Array.isArray(registryData.services)) {
         services = registryData.services;
-        loadedFromConsolidated = true;
+        loadedFromConsolidated = services.length > 0;
+        if (loadedFromConsolidated) {
+          usedAPI = fetchUsedAPI;
+        }
         console.log(
           `Loaded ${services.length} services from consolidated registry (generated at ${registryData.generated_at})`
         );
@@ -182,7 +184,18 @@ export async function loadServices(): Promise<LoadServicesResult> {
   if (!loadedFromConsolidated) {
     console.log('Loading services via tree API...');
     const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
-    const response = await fetch(apiUrl);
+    const token = getToken();
+    let response = await fetch(
+      apiUrl,
+      token ? { headers: { Authorization: `token ${token}` } } : undefined
+    );
+
+    if (token && (response.status === 401 || response.status === 403 || response.status === 429)) {
+      if (response.status === 401) {
+        clearToken();
+      }
+      response = await fetch(apiUrl);
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to fetch repository tree: ${response.status}`);
@@ -196,28 +209,29 @@ export async function loadServices(): Promise<LoadServicesResult> {
         (item) =>
           item.path.startsWith('registry/') &&
           item.path.endsWith('.json') &&
-          item.path !== 'registry/all-services.json'
+          item.path !== 'registry/all-services.json' &&
+          item.path !== 'registry/services.json'
       )
       .map((item) => item.path);
-
-    if (registryFiles.length === 0) {
-      throw new Error('No services registered yet');
-    }
 
     // Fetch all registry files in parallel
     const fetchPromises = registryFiles.map(async (path) => {
       const { response, usedAPI: fetchUsedAPI } = await fetchWithHybridAuth(path);
-      if (fetchUsedAPI) {
-        usedAPI = true;
-      }
       if (response.ok) {
-        return response.json() as Promise<ServiceData>;
+        return { service: (await response.json()) as ServiceData, usedAPI: fetchUsedAPI };
       }
       return null;
     });
 
     const results = await Promise.all(fetchPromises);
-    services = results.filter((service): service is ServiceData => service !== null);
+    const loadedServices = results.filter(
+      (result): result is { service: ServiceData; usedAPI: boolean } => result !== null
+    );
+    services = loadedServices.map(({ service }) => service);
+    usedAPI =
+      loadedServices.length > 0 &&
+      loadedServices.every(({ usedAPI: fetchUsedAPI }) => fetchUsedAPI);
+
     console.log(`Loaded ${services.length} services via tree API`);
   }
 

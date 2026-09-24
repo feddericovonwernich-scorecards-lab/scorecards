@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Use ephemeral same-repository credentials for catalog UI/checks-hash publication and explicit pinned Pages artifact deployment; preserve domain files and document the coordinated legacy-source transition and rollback.
+- Restrict installation targets to new or explicitly adopted empty `scorecards` repositories; see the [installation contract](documentation/guides/platform-installation.md) for publication and deployment safeguards.
+- Preserve pending deployment polling, bind the installer payload to its executing checkout, and document protected release pins and source-versus-installed commit provenance.
+- Fetch full pinned ancestry and preserve bootstrap failures; require single-writer acknowledgement and recheck target refs before atomic publication.
+- Verify restricted Pages through isolated browser sessions without changing visibility, and compile relative assets for both private-origin and project-path hosting.
+- Report registry freshness from returned service data rather than discarded consolidated responses or discovery requests.
+- Treat an empty consolidated registry as provisional when individual service entries exist, exclude the legacy placeholder, and authenticate tree discovery while preserving the real empty state.
+- Route both onboarding entrypoints through one central PR owner, reuse open PRs, respect closed PRs by default, and preserve earlier branches during explicit retries.
 - Preserve remediation source contents, reuse mixed-case destination PRs, retain accepted requests and verified run links when discovery fails, and align installation template consumers.
 - Preserve case-sensitive remediation badge URLs and publish validated README bytes without Git encoding/filter conversions; document fresh scoring and separate service/platform checkouts.
 - Accept canonical GitHub repository casing in remediation links, retain the run-summary fallback for incomplete PR searches, and derive clone/push destinations only from the authorized repository.
@@ -24,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Prepare the single-repository badge pilot policy with the published runtime digest and verified publisher identity; document zero-independent-approval protection, integration prerequisites and still-unexercised consumer writes.
+- **BREAKING**: Retire `SCORECARDS_USE_EXISTING`, arbitrary central repository names, moving-source `curl | bash` installation, and legacy Pages setup for new installations. Existing installations require a documented manual migration rather than rerunning the installer.
 - Pin runtime base/Node digests, signed Ubuntu snapshot and npm lockfile; retain scoring/sandbox compatibility without claiming bit-for-bit rebuilds.
 - **BREAKING**: Migrated catalog UI from vanilla JavaScript to React 19 + TypeScript
   - Replaced ES6 modules with React functional components
