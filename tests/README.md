@@ -48,6 +48,10 @@ bats tests/unit/bash/test_common.bats
 pytest tests/unit/python/test_license_check.py
 ```
 
+For authoring prerequisites, direct fixtures, the production Docker runner, and
+the offline remediation harness, follow the
+[Check Development Guide](../documentation/guides/check-development-guide.md#testing-your-check-locally).
+
 ## Writing Tests
 
 ### React Components (Jest + React Testing Library)
