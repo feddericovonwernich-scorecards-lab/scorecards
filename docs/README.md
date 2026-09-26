@@ -234,7 +234,7 @@ still apply.
    `source`, `cname`, HTTPS setting, deployed revision and `catalog` SHA. Retain
    the known-good `catalog:/docs` tree for rollback, including any domain file.
    Existing central settings are legacy `catalog:/docs` at
-   `https://feddericovonwernich.github.io/scorecards/`; verify rather than
+   `https://feddericovonwernich-scorecards-lab.github.io/scorecards/`; verify rather than
    assuming they are unchanged.
 2. Confirm Actions allows the pinned Pages actions and native token writes to
    `catalog`. Keep `main` PR protections intact. Configure `github-pages` to

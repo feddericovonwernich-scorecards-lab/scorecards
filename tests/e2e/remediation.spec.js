@@ -18,7 +18,7 @@ const requestId = '00000000-0000-4000-8000-000000000001';
 const evaluation = {
   service_repository: service,
   service_sha: '1'.repeat(40),
-  suite_repository: 'feddericovonwernich/scorecards',
+  suite_repository: 'feddericovonwernich-scorecards-lab/scorecards',
   suite_sha: '2'.repeat(40),
   run_id: '123',
   run_attempt: 1,
@@ -66,7 +66,7 @@ async function mockRemediationApi(
     runs = [],
   } = {}
 ) {
-  await page.route('**/api.github.com/repos/feddericovonwernich/scorecards', (route) =>
+  await page.route('**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -81,7 +81,7 @@ async function mockRemediationApi(
     })
   );
   await page.route(
-    '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml',
+    '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml',
     (route) =>
       route.fulfill({
         status: 200,
@@ -90,7 +90,7 @@ async function mockRemediationApi(
       })
   );
   await page.route(
-    '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/dispatches',
+    '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/dispatches',
     (route) =>
       route.fulfill({
         status: dispatch.status,
@@ -99,7 +99,7 @@ async function mockRemediationApi(
       })
   );
   await page.route(
-    '**/api.github.com/repos/feddericovonwernich/scorecards/contents/action/config/remediation.json*',
+    '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/contents/action/config/remediation.json*',
     (route) =>
       route.fulfill({
         status: 200,
@@ -180,7 +180,7 @@ test.describe('Optional check remediation', () => {
     await mockRemediationApi(page);
     let request;
     await page.route(
-      '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/dispatches',
+      '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/dispatches',
       async (route) => {
         request = route.request().postDataJSON();
         await route.fulfill({
@@ -344,7 +344,7 @@ test.describe('Optional check remediation', () => {
           event: 'workflow_dispatch',
           display_title: 'remediation:someone-else',
           created_at: new Date().toISOString(),
-          html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/99',
+          html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/99',
         },
         {
           id: 42,
@@ -369,7 +369,7 @@ test.describe('Optional check remediation', () => {
     await mockRemediationApi(page, { dispatch: { status: 204 } });
     let polls = 0;
     await page.route(
-      '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/runs*',
+      '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/runs*',
       (route) => {
         polls += 1;
         const workflow_runs =
@@ -382,7 +382,7 @@ test.describe('Optional check remediation', () => {
                   event: 'workflow_dispatch',
                   display_title: `remediation:${requestId}`,
                   created_at: new Date().toISOString(),
-                  html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+                  html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
                 },
               ];
         return route.fulfill({
@@ -416,8 +416,8 @@ test.describe('Optional check remediation', () => {
         });
         const endpoint =
           status === 200
-            ? '**/api.github.com/repos/feddericovonwernich/scorecards/actions/runs/42'
-            : '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/runs*';
+            ? '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42'
+            : '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/runs*';
         await page.route(endpoint, (route) =>
           failure === 'transport'
             ? route.abort('failed')
@@ -448,7 +448,7 @@ test.describe('Optional check remediation', () => {
       });
       if (failure === 'policy transport') {
         await page.route(
-          '**/api.github.com/repos/feddericovonwernich/scorecards/contents/action/config/remediation.json*',
+          '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/contents/action/config/remediation.json*',
           (route) => route.abort('failed')
         );
       } else {
@@ -482,8 +482,8 @@ test.describe('Optional check remediation', () => {
         status: 200,
         body: {
           run_id: 42,
-          run_url: 'https://api.github.com/repos/feddericovonwernich/scorecards/actions/runs/42',
-          html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+          run_url: 'https://api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
+          html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
         },
       },
     });
@@ -502,7 +502,7 @@ test.describe('Optional check remediation', () => {
         status: 200,
         body: {
           workflow_run_id: 42,
-          html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+          html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
         },
       },
     });
@@ -518,7 +518,7 @@ test.describe('Optional check remediation', () => {
     await closeServiceModal(page);
     await mockRemediationApi(page);
     await page.route(
-      '**/api.github.com/repos/feddericovonwernich/scorecards/actions/runs/42',
+      '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
       (route) =>
         route.fulfill({
           status: 200,
@@ -529,7 +529,7 @@ test.describe('Optional check remediation', () => {
             event: 'workflow_dispatch',
             display_title: `remediation:${requestId}`,
             head_sha: '3'.repeat(40),
-            html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+            html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
           }),
         })
     );
@@ -557,12 +557,12 @@ test.describe('Optional check remediation', () => {
           event: 'workflow_dispatch',
           display_title: `remediation:${requestId}`,
           created_at: new Date().toISOString(),
-          html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+          html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
         },
       ],
     });
     await page.route(
-      '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/dispatches',
+      '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/dispatches',
       async (route) => {
         dispatches += 1;
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -633,7 +633,7 @@ test.describe('Optional check remediation', () => {
     });
     await mockRemediationApi(page);
     await page.route(
-      '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/dispatches',
+      '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/dispatches',
       async (route) => {
         await responseReady;
         await route.fulfill({
@@ -660,7 +660,7 @@ test.describe('Optional check remediation', () => {
     await mockRemediationApi(page);
     let dispatches = 0;
     await page.route(
-      '**/api.github.com/repos/feddericovonwernich/scorecards/actions/workflows/remediate-check.yml/dispatches',
+      '**/api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/workflows/remediate-check.yml/dispatches',
       (route) => {
         dispatches += 1;
         return route.abort('failed');

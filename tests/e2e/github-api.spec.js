@@ -230,8 +230,8 @@ test.describe('GitHub API - Workflow Dispatch', () => {
       status: 200,
       body: {
         workflow_run_id: 42,
-        run_url: 'https://api.github.com/repos/feddericovonwernich/scorecards/actions/runs/42',
-        html_url: 'https://github.com/feddericovonwernich/scorecards/actions/runs/42',
+        run_url: 'https://api.github.com/repos/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
+        html_url: 'https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/42',
       },
     });
 

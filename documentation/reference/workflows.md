@@ -121,7 +121,7 @@ For `.github/workflows/publish-remediation-runtime.yml`, see the authoritative [
 
 - `org` (required) - Organization/user name
 - `repo` (required) - Repository name
-- `scorecards-repo` (optional) - Central scorecards repository (default: 'feddericovonwernich/scorecards'); must match the executing repository
+- `scorecards-repo` (optional) - Central scorecards repository (default: 'feddericovonwernich-scorecards-lab/scorecards'); must match the executing repository
 - `scorecards-branch` (optional) - Branch for results (default: 'catalog')
 - `retry-closed` (optional, default: `false`) - Explicitly permit a fresh attempt after a closed or merged PR
 - `request-id` (optional) - Correlation identifier supplied by the reusable caller
@@ -358,9 +358,9 @@ For detailed workflow interactions and data flows, see:
 ```yaml
 jobs:
   scorecards:
-    uses: feddericovonwernich/scorecards/.github/workflows/install.yml@main
+    uses: feddericovonwernich-scorecards-lab/scorecards/.github/workflows/install.yml@main
     with:
-      scorecards-repo: feddericovonwernich/scorecards
+      scorecards-repo: feddericovonwernich-scorecards-lab/scorecards
     secrets:
       scorecards-catalog-token: ${{ secrets.SCORECARDS_CATALOG_TOKEN }}
       scorecards-workflow-token: ${{ secrets.SCORECARDS_WORKFLOW_TOKEN }}

@@ -15,7 +15,7 @@ on:
         description: 'Central scorecards repository (owner/repo)'
         required: false
         type: string
-        default: 'feddericovonwernich/scorecards'
+        default: 'feddericovonwernich-scorecards-lab/scorecards'
       scorecards-branch:
         description: 'Branch to commit results to in central repo'
         required: false
@@ -162,7 +162,7 @@ jobs:
           git switch -c "$INSTALL_BRANCH"
 
           mkdir -p .github/workflows .scorecard
-          sed -e "s|feddericovonwernich/scorecards|${{ inputs.scorecards-repo }}|g" \
+          sed -e "s|feddericovonwernich-scorecards-lab/scorecards|${{ inputs.scorecards-repo }}|g" \
               -e "s|scorecards-branch: 'catalog'|scorecards-branch: '${{ inputs.scorecards-branch }}'|g" \
               ../scorecards-repo/documentation/examples/scorecard-workflow-template.yml > .github/workflows/scorecards.yml
 

@@ -7,7 +7,7 @@ on:
         description: 'Central scorecards repository (owner/repo)'
         required: false
         type: string
-        default: 'feddericovonwernich/scorecards'
+        default: 'feddericovonwernich-scorecards-lab/scorecards'
       scorecards-branch:
         description: 'Branch to commit results to in central repo'
         required: false

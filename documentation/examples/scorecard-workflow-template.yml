@@ -23,7 +23,7 @@ jobs:
       - name: Checkout Scorecards platform
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          repository: 'feddericovonwernich/scorecards'
+          repository: 'feddericovonwernich-scorecards-lab/scorecards'
           # Omit ref to resolve the central repository's actual default branch.
           token: ${{ secrets.SCORECARDS_CATALOG_TOKEN }}
           path: .scorecards-platform
@@ -34,7 +34,7 @@ jobs:
         id: scorecards
         with:
           github-token: ${{ secrets.SCORECARDS_CATALOG_TOKEN }}
-          scorecards-repo: 'feddericovonwernich/scorecards'
+          scorecards-repo: 'feddericovonwernich-scorecards-lab/scorecards'
           scorecards-branch: 'catalog'
           service-workspace: ${{ github.workspace }}/service
 

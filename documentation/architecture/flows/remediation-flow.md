@@ -120,7 +120,7 @@ Abrir o cerrar un PR no actualiza el score. Sólo una nueva evaluación después
 ## Publicación del runtime
 
 `publish-remediation-runtime.yml` sólo admite `workflow_dispatch`, sin inputs, en
-`feddericovonwernich/scorecards:main`. Hace checkout del SHA del evento, no de código
+`feddericovonwernich-scorecards-lab/scorecards:main`. Hace checkout del SHA del evento, no de código
 de forks ni de una revisión elegida mediante input. **No ejecutarlo hasta revisar
 e integrar su cambio mediante PR con aprobación del captain.** El filtro de rama
 no demuestra revisión: proteger main y autorizar su integración siguen siendo
@@ -128,7 +128,7 @@ prerrequisitos externos. Abrir el PR no publica nada.
 
 Construye el [runtime compartido](../../reference/action-reference.md#runtime-build),
 ejecuta el smoke real y publica exclusivamente
-`ghcr.io/feddericovonwernich/scorecards-remediation-runtime:<SHA completo>`.
+`ghcr.io/feddericovonwernich-scorecards-lab/scorecards-remediation-runtime:<SHA completo>`.
 Usa sólo `GITHUB_TOKEN` efímero con `contents: read` y `packages: write`; no requiere
 PAT ni secrets nuevos. Las Actions externas están fijadas por commit. La etiqueta
 OCI `org.opencontainers.image.source` enlaza el repositorio y `revision` registra
@@ -184,10 +184,10 @@ Evidencia disponible:
 
 - Runtime fijado en `action/config/remediation.json`, publicado desde
   `b73a323e91fb537220e91e8b5b3481dd249dd873` en
-  [el run de publicación](https://github.com/feddericovonwernich/scorecards/actions/runs/35658198735).
+  [el run de publicación](https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/35658198735).
   El recibo confirma manifest y pull anónimos, revisión de fuente y smoke de
   la imagen descargada. No demuestra reproducibilidad bit a bit ni el piloto.
-- [Pages desplegado](https://github.com/feddericovonwernich/scorecards/actions/runs/35666405366):
+- [Pages desplegado](https://github.com/feddericovonwernich-scorecards-lab/scorecards/actions/runs/35666405366):
   el recibo de operación compara los 19 archivos servidos con el artefacto,
   sin diferencias. Esto prueba publicación del catálogo, no elegibilidad.
 - Rotación de credenciales registrada el 2026-09-22T23:10:06.161Z: `/user` con
